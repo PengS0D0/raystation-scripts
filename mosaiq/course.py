@@ -21,7 +21,7 @@ class Course:
   @classmethod
   def find(cls, id):
     instance = None
-    row = Database.fetch_one("SELECT * FROM PatCPlan WHERE PCP_ID = '{}'".format(str(id)))
+    row = Database.fetch_one("SELECT * FROM PatCPlan WHERE PCP_ID = ? ".format(str(id)))
     if row != None:
       instance = cls(row)
     return instance
@@ -31,7 +31,7 @@ class Course:
   @classmethod
   def for_diagnosis(cls, diagnosis):
     courses = list()
-    rows = Database.fetch_all("SELECT * FROM PatCPlan WHERE MED_ID = '{}'".format(diagnosis.id))
+    rows = Database.fetch_all("SELECT * FROM PatCPlan WHERE MED_ID = ? ".format(diagnosis.id))
     for row in rows:
       courses.append(cls(row))
     courses.sort(key=lambda c: c.number, reverse=False)
@@ -42,7 +42,7 @@ class Course:
   @classmethod
   def for_patient(cls, patient):
     courses = list()
-    rows = Database.fetch_all("SELECT * FROM PatCPlan WHERE Pat_ID1 = '{}'".format(patient.id))
+    rows = Database.fetch_all("SELECT * FROM PatCPlan WHERE Pat_ID1 = ? ".format(patient.id))
     for row in rows:
       courses.append(cls(row))
     courses.sort(key=lambda c: c.number, reverse=False)
