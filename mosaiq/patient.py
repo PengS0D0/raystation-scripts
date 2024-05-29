@@ -1,13 +1,5 @@
-# encoding: utf8
 
-# A class for reading patient data from the Mosaiq database.
-#
-# Authors:
-# Christoffer Lervåg
-# Helse Møre og Romsdal HF
-#
-# Python 3.6
-
+#original import
 from .course import Course
 from .database import Database
 from .delivered_dose import DeliveredDose
@@ -23,7 +15,8 @@ class Patient:
   @classmethod
   def find(cls, id):
     instance = None
-    row = Database.fetch_one("SELECT * FROM Patient WHERE Pat_ID1 = '{}'".format(str(id)))
+    #fetch_one return a dictionary
+    row= Database.fetch_one("SELECT * FROM Patient WHERE Pat_ID1 = ?",format(str(id)))
     if row != None:
       instance = cls(row)
     return instance
@@ -46,31 +39,37 @@ class Patient:
     first_name = str(first_name)
     if len(last_name) == 0 and len(first_name) == 0:
       raise InputError("Too few characters used. Requires at least 1 character in order to define a meaningful db search.")
-    if len(last_name) > 0:
-      ln_part = "Last_Name LIKE '{}%'".format(last_name)
-    else:
-      ln_part = ""
-    if len(first_name) > 0:
-      fn_part = "First_Name LIKE '{}%'".format(first_name)
-    else:
-      fn_part = ""
+    #rewrite for pyodbc by ypeng
     if len(last_name) > 0 and len(first_name) > 0:
-      mid_part = " AND "
-    else:
-      mid_part = ""
+      text1="SELECT TOP 30 * FROM Patient WHERE Last_Name LIKE ? AND First_Name LIKE ?"
+      parameters=[last_name,first_name]
+    if len(last_name) > 0 and len(first_name) == 0:
+      text1="SELECT TOP 30 * FROM Patient WHERE Last_Name LIKE ?"
+      parameters=[last_name]    
+    if len(last_name) == 0 and len(first_name) > 0:
+      text1="SELECT TOP 30 * FROM Patient WHERE  First_Name LIKE ?"
+      parameters=[first_name]
     patients = list()
-    rows = Database.fetch_all("SELECT TOP {} * FROM Patient WHERE {}{}{}".format(str(max_patients), ln_part, mid_part, fn_part))
+    # rows = Database.fetch_all("SELECT TOP {} * FROM Patient WHERE {}{}{}".format(str(max_patients), ln_part, mid_part, fn_part))
+    rows = Database.fetch_all(text1,parameters)
+    # columns = [column[0] for column in cursor.description]#get column header
+    
     for row in rows:
-      patients.append(cls(row))
+      # print(row)
+      # row0 = dict(zip(columns,row0))
+      patients.append(cls(row))#basically, cls(row0) is call the Patient class and initialize it with row0 as parameter
+      # print( row['Pat_Id1'])
     return patients
   
   # Returns a Pat_Id1 matching the given patient IDA (or None if no match).
   @classmethod
   def pat_id1_from_ida(cls, fnr):
     pat_id1 = None
-    row = Database.fetch_one("SELECT * FROM Ident WHERE IDA = '{}'".format(str(fnr)))
+    row= Database.fetch_one("SELECT * FROM Ident WHERE IDA = ?",format(str(fnr)))
+
     if row != None:
       pat_id1 = row['Pat_Id1'] # (typo probably in database table: lower case d)
+
     return pat_id1
   
   # Creates a Patient instance from a patient database row.
@@ -102,13 +101,14 @@ class Patient:
     self.instance_notes = None
     self.instance_pat_ida = None
     self.instance_prescriptions = None
-    self.instance_performed_site_setups = None
+    self.instance_performed_site_setups = None 
     self.instance_scheduled_fields = None
+    self.instance_sessions = None #added by yp
 
   # Patient's address (postal code).
   def address(self):
     if not self.instance_address:
-      row = Database.fetch_one("SELECT * FROM Admin WHERE Pat_ID1 = '{}'".format(self.pat_id1))
+      row = Database.fetch_one("SELECT * FROM Admin WHERE Pat_ID1 = ?",format(self.pat_id1))
       if row != None:
         self.instance_address = row['Pat_Postal']
     return self.instance_address
@@ -158,7 +158,7 @@ class Patient:
   # Gives the full name (formatted by last name, comma first name space middle name).
   def full_name(self):
     name = self.last_name.rstrip()
-    if len(first_name > 0):
+    if len(self.first_name )> 0:#len(first_name > 0):
       name = "{}, {} {}".format(name, self.first_name, self.middle_name).rstrip()
     return name
   
@@ -171,7 +171,7 @@ class Patient:
   # Patient's institution id (e.g. 1 for Site 1, 2 for Site 2).
   def institution_id(self):
     if not self.instance_institution_id:
-      row = Database.fetch_one("SELECT * FROM AdmDept WHERE Pat_ID1 = '{}'".format(self.pat_id1))
+      row = Database.fetch_one("SELECT * FROM AdmDept WHERE Pat_ID1 = ?",format(self.pat_id1))
       if row != None:
         self.instance_institution_id = row['Inst_ID']
     return self.instance_institution_id
@@ -179,7 +179,7 @@ class Patient:
   # Patient's nursing status (in hospital bed or not).
   def is_in(self):
     if not self.instance_is_in:
-      row = Database.fetch_one("SELECT * FROM Admin WHERE Pat_ID1 = '{}'".format(self.pat_id1))
+      row = Database.fetch_one("SELECT * FROM Admin WHERE Pat_ID1 = ?",format(self.pat_id1))
       if row != None:
         self.instance_is_in = row['IsInPatient']
     return self.instance_is_in
@@ -187,7 +187,7 @@ class Patient:
   # Patient's location (nursing unit).
   def location(self):
     if not self.instance_location:
-      row = Database.fetch_one("SELECT * FROM Admin WHERE Pat_ID1 = '{}'".format(self.pat_id1))
+      row = Database.fetch_one("SELECT * FROM Admin WHERE Pat_ID1 = ?",format(self.pat_id1))
       if row != None:
         self.instance_location = row['Nurse_Unit']
     return self.instance_location
@@ -222,7 +222,7 @@ class Patient:
   # Patients PAT_IDA (social security nr).
   def pat_ida(self):
     if not self.instance_pat_ida:
-      row = Database.fetch_one("SELECT * FROM Ident WHERE Pat_ID1 = '{}'".format(self.pat_id1))
+      row = Database.fetch_one("SELECT * FROM Ident WHERE Pat_ID1 = ?",format(self.pat_id1))
       if row != None:
         self.instance_pat_ida = row['IDA']
     return self.instance_pat_ida
