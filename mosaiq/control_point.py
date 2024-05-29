@@ -1,16 +1,4 @@
-# encoding: utf8
-
-# A class for reading control_point data from the Mosaiq database.
-#
-# Authors:
-# Christoffer Lervåg
-# Helse Møre og Romsdal HF
-#
-# Python 3.6
-
-# Used for GUI debugging:
-#from tkinter import *
-#from tkinter import messagebox
+# force to sort the control points, otherwise, in some case, Mosaiq returned gantry angles would be chaos
 
 from .database import Database
 
@@ -20,7 +8,7 @@ class ControlPoint:
   @classmethod
   def find(cls, id):
     instance = None
-    row = Database.fetch_one("SELECT * FROM TxFieldPoint WHERE TFP_ID = '{}'".format(str(id)))
+    row = Database.fetch_one("SELECT * FROM TxFieldPoint WHERE TFP_ID = ?",format(str(id)))
     if row != None:
       instance = cls(row)
     return instance
@@ -30,8 +18,10 @@ class ControlPoint:
   @classmethod
   def for_field(cls, field):
     control_points = list()
-    rows = Database.fetch_all("SELECT * FROM TxFieldPoint WHERE FLD_ID = '{}'".format(field.id))
+    rows = Database.fetch_all("SELECT * FROM TxFieldPoint WHERE FLD_ID = ?",format(field.id))
+    rows = sorted(rows, key=lambda d: d['Point'])#* force to sort the rows in asending order, yp 4/23/2024
     for row in rows:
+      # print(row['Gantry_Ang']) #testing
       control_points.append(cls(row))
     return control_points
   
@@ -53,10 +43,10 @@ class ControlPoint:
     self.collimator_angle = row['Coll_Ang']
     self.field_size_x = row['Field_X']
     self.field_size_y = row['Field_Y']
-    self.collimator_x1 = float(row['Coll_X1'])
-    self.collimator_x2 = float(row['Coll_X2'])
-    self.collimator_y1 = float(row['Coll_Y1'])
-    self.collimator_y2 = float(row['Coll_Y2'])
+    self.collimator_x1 = row['Coll_X1']
+    self.collimator_x2 = row['Coll_X2']
+    self.collimator_y1 = row['Coll_Y1']
+    self.collimator_y2 = row['Coll_Y2']
     self.beam_intensity = row['Beam_Intensity']
     self.energy = row['Energy']
     self.energy_unit_id = row['Energy_Unit_Enum']
@@ -110,8 +100,8 @@ class ControlPoint:
   def gantry_rotation(self):
     values = {
       0 : 'Unspecified',
-      1 : 'CW',
-      2 : 'CC',
+      1 : 'Clockwise',
+      2 : 'CounterClockwise',
       3 : 'NONE'
     }
     return values.get(self.gantry_rotation_id, 'Unknown gantry_rotation_id: {}'.format(self.gantry_rotation_id))
